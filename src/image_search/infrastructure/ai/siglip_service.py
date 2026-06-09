@@ -1,5 +1,3 @@
-from typing import Any
-
 import torch  # type: ignore[import-not-found]
 import structlog
 from PIL import Image  # type: ignore[import-not-found]

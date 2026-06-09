@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     hnsw_ef_construction: int = 64
     hnsw_ef_search: int = 40
 
+    # Worker
+    worker_id: str = "1"
+    caption_enabled: bool = False
+    gemini_api_key: str | None = None
+
     model_config = {"env_prefix": "IMAGE_SEARCH_"}
 
 

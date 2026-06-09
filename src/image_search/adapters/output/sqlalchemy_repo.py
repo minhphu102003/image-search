@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from image_search.domain.entities import ImageEmbedding, ImageStatus
@@ -90,3 +90,21 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
             return False
         await self.session.delete(model)
         return True
+
+    async def update_status(self, image_id: str, status: str, error: str | None = None) -> None:
+        stmt = (
+            update(ImageEmbeddingModel)
+            .where(ImageEmbeddingModel.image_id == image_id)
+            .values(status=status, error_message=error)
+        )
+        await self.session.execute(stmt)
+        await self.session.flush()
+
+    async def update_caption(self, image_id: str, caption: str, caption_embedding: list[float]) -> None:
+        stmt = (
+            update(ImageEmbeddingModel)
+            .where(ImageEmbeddingModel.image_id == image_id)
+            .values(caption=caption, caption_embedding=caption_embedding)
+        )
+        await self.session.execute(stmt)
+        await self.session.flush()
