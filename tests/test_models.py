@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -51,9 +50,7 @@ async def test_insert_and_query(session: AsyncSession):
     session.add(model)
     await session.flush()
 
-    result = await session.execute(
-        select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == "img-query-test")
-    )
+    result = await session.execute(select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == "img-query-test"))
     found = result.scalar_one()
     assert found.id == model.id
     assert len(found.embedding) == 1024
@@ -78,9 +75,7 @@ async def test_nullable_caption_embedding(session: AsyncSession):
     session.add(model)
     await session.flush()
 
-    result = await session.execute(
-        select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == "img-no-caption")
-    )
+    result = await session.execute(select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == "img-no-caption"))
     found = result.scalar_one()
     assert found.caption_embedding is None
 
@@ -105,10 +100,7 @@ async def test_cosine_similarity_search(session: AsyncSession):
     query_vec = embeddings[0][1]
     distance_col = ImageEmbeddingModel.embedding.cosine_distance(query_vec)
     result = await session.execute(
-        select(ImageEmbeddingModel)
-        .where(ImageEmbeddingModel.status == "INDEXED")
-        .order_by(distance_col)
-        .limit(3)
+        select(ImageEmbeddingModel).where(ImageEmbeddingModel.status == "INDEXED").order_by(distance_col).limit(3)
     )
     found = result.scalars().all()
     assert len(found) == 3

@@ -66,9 +66,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
         return _to_entity(model)
 
     async def get_by_image_id(self, image_id: str) -> ImageEmbedding | None:
-        result = await self.session.execute(
-            select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == image_id)
-        )
+        result = await self.session.execute(select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == image_id))
         model = result.scalar_one_or_none()
         return _to_entity(model) if model is not None else None
 
@@ -77,10 +75,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
     ) -> list[ImageEmbedding]:
         distance = ImageEmbeddingModel.embedding.cosine_distance(query_embedding)
         stmt = (
-            select(ImageEmbeddingModel)
-            .where(ImageEmbeddingModel.status == "INDEXED")
-            .order_by(distance)
-            .limit(limit)
+            select(ImageEmbeddingModel).where(ImageEmbeddingModel.status == "INDEXED").order_by(distance).limit(limit)
         )
         if user_id is not None:
             stmt = stmt.where(ImageEmbeddingModel.user_id == user_id)
@@ -89,9 +84,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
         return [_to_entity(m) for m in result.scalars().all()]
 
     async def delete_by_image_id(self, image_id: str) -> bool:
-        result = await self.session.execute(
-            select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == image_id)
-        )
+        result = await self.session.execute(select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == image_id))
         model = result.scalar_one_or_none()
         if model is None:
             return False

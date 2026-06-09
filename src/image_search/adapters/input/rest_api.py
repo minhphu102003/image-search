@@ -51,9 +51,7 @@ class SearchRequest(BaseModel):
 
 
 @router.post("/ingest", response_model=ImageResponse)
-async def ingest_image(
-    body: IngestRequest, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)
-):
+async def ingest_image(body: IngestRequest, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)):
     uc = IngestImageUseCase(repo)
     entity = await uc.execute(
         image_id=body.image_id,
@@ -76,13 +74,9 @@ async def ingest_image(
 
 
 @router.post("/search", response_model=list[ImageResponse])
-async def search_images(
-    body: SearchRequest, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)
-):
+async def search_images(body: SearchRequest, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)):
     uc = SearchImagesUseCase(repo)
-    results = await uc.execute(
-        query_embedding=body.query_embedding, limit=body.limit, user_id=body.user_id
-    )
+    results = await uc.execute(query_embedding=body.query_embedding, limit=body.limit, user_id=body.user_id)
     return [
         ImageResponse(
             id=e.id,
@@ -98,9 +92,7 @@ async def search_images(
 
 
 @router.get("/{image_id}", response_model=ImageResponse)
-async def get_image(
-    image_id: str, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)
-):
+async def get_image(image_id: str, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)):
     uc = GetImageUseCase(repo)
     entity = await uc.execute(image_id)
     if entity is None:
@@ -117,9 +109,7 @@ async def get_image(
 
 
 @router.delete("/{image_id}")
-async def delete_image(
-    image_id: str, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)
-):
+async def delete_image(image_id: str, repo: SqlAlchemyImageEmbeddingRepository = Depends(_get_repo)):
     uc = DeleteImageUseCase(repo)
     deleted = await uc.execute(image_id)
     if not deleted:
