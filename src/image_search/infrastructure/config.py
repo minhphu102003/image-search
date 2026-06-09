@@ -5,6 +5,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/beekid_ai"
     redis_url: str = "redis://localhost:6379"
 
+    # SigLIP 2 embedding
+    siglip_model: str = "google/siglip2-so400m-patch16-384"
+    siglip_device: str | None = None
+    embed_batch_size: int = 8
+
     # pgvector HNSW parameters
     hnsw_m: int = 16
     hnsw_ef_construction: int = 64
