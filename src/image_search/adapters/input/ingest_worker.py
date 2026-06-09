@@ -2,13 +2,13 @@ import asyncio
 
 import structlog
 
+from image_search.adapters.output.sqlalchemy_repo import SqlAlchemyImageEmbeddingRepository
 from image_search.application.ingest_worker import IngestWorkerUseCase
 from image_search.domain.events import ImageUploadedEvent
 from image_search.infrastructure.ai.siglip_service import SigLIPEmbeddingService
 from image_search.infrastructure.config import settings
 from image_search.infrastructure.database.connection import async_session
 from image_search.infrastructure.redis.event_bus import RedisEventBus
-from image_search.adapters.output.sqlalchemy_repo import SqlAlchemyImageEmbeddingRepository
 
 logger = structlog.get_logger()
 

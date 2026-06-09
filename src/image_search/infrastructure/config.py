@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     hnsw_ef_construction: int = 64
     hnsw_ef_search: int = 40
 
+    # Search
+    image_search_approach: int = 1
+    image_search_host: str = "0.0.0.0"
+    image_search_port: int = 8000
+
     # Worker
     worker_id: str = "1"
     caption_enabled: bool = False
