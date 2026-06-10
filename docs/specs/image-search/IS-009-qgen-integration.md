@@ -158,8 +158,8 @@ image_search_top_k: int = 5
 
 ## 6. Acceptance Criteria
 
-- [ ] QGen can call `POST /api/v1/image-search` and receive valid response
-- [ ] If Image Search is down, QGen proceeds without images
+- [x] QGen can call `POST /api/v1/image-search` and receive valid response
+- [x] If Image Search is down, QGen proceeds without images
 - [ ] Images are included in Generator context
 - [ ] Generated questions reference images when relevant
 - [ ] Latency: image search adds < 500ms to QGen pipeline
