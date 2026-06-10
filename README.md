@@ -99,14 +99,84 @@ make help        # see all commands
 
 ## Architecture
 
-```
-Domain (entities, ports) ← Adapters (FastAPI, SQLAlchemy, MinIO) ← Infrastructure (DB, Redis, AI)
+**Clean Architecture dependency flow:**
+
+```mermaid
+graph LR
+    subgraph Adapters Input
+        REST[FastAPI REST]
+        Worker[Ingest Worker]
+    end
+    subgraph Application
+        UC[Use Cases]
+    end
+    subgraph Domain
+        Entity[Entities]
+        Port[Ports / ABCs]
+    end
+    subgraph Adapters Output
+        Repo[SQLAlchemy Repo]
+        EventBus[Redis EventBus]
+        MinIO[MinIO Storage]
+        SigLIP[SigLIP Service]
+    end
+    subgraph Infrastructure
+        DB[(PostgreSQL + pgvector)]
+        Redis[(Redis Streams)]
+        S3[(MinIO)]
+        AI[SigLIP 2 Model]
+    end
+
+    REST --> UC
+    Worker --> UC
+    UC --> Entity
+    UC --> Port
+    Repo --> Port
+    EventBus --> Port
+    MinIO --> Port
+    SigLIP --> Port
+    Repo --> DB
+    EventBus --> Redis
+    MinIO --> S3
+    SigLIP --> AI
 ```
 
-```
-Client → Upload → MinIO → URL → Redis Event → Worker → SigLIP 2 → PostgreSQL
-                                                                      ↓
-Client → Search ← FastAPI ← pgvector cosine similarity ←─────────────┘
+**Data flow — Upload & Search:**
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as FastAPI API
+    participant M as MinIO
+    participant R as Redis Stream
+    participant W as Worker
+    participant S as SigLIP 2
+    participant PG as PostgreSQL
+
+    rect rgb(220, 240, 255)
+    Note over C,PG: Upload Flow
+    C->>API: POST /api/v1/upload (file + user_id)
+    API->>M: Store image
+    M-->>API: presigned URL
+    API->>R: XADD image:uploaded {url}
+    API-->>C: {image_id, status: "uploaded"}
+    R->>W: Consume event
+    W->>M: Download image from URL
+    W->>S: embed_image()
+    S-->>W: 1024-dim vector
+    W->>PG: INSERT embedding
+    W->>R: XADD image:indexed
+    end
+
+    rect rgb(220, 255, 220)
+    Note over C,PG: Search Flow
+    C->>API: POST /api/v1/image-search {query}
+    API->>S: embed_text(query)
+    S-->>API: 1024-dim vector
+    API->>PG: cosine similarity search
+    PG-->>API: top-k results
+    API-->>C: [{image_id, file_path, score}]
+    end
 ```
 
 ## Specs
