@@ -124,3 +124,4 @@ Implementation specs live in `docs/specs/image-search/IS-*.md`. Each spec has ac
 - All async functions use `async def` / `await` (no sync wrappers)
 - `uv` is the package manager — do not use pip directly
 - Commit messages follow conventional commits: `feat:`, `fix:`, `chore:`, `docs:`
+- **Diagrams MUST use Mermaid** — never ASCII art. Use `graph TD/LR` for architecture, `sequenceDiagram` for flows, `flowchart` for logic. See `.claude/commands/diagram.md` for details
