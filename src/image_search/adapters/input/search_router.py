@@ -9,6 +9,7 @@ from image_search.domain.embedding_service import EmbeddingService
 from image_search.domain.search_approach import SearchApproach
 from image_search.infrastructure.config import settings
 from image_search.infrastructure.database.connection import async_session
+from image_search.infrastructure.observability.metrics import SEARCH_ERRORS
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
 
@@ -96,6 +97,7 @@ async def search_images(
     approach = req.approach or settings.image_search_approach
 
     if approach not in use_case.approaches:
+        SEARCH_ERRORS.labels(error_type="invalid_approach").inc()
         raise HTTPException(status_code=400, detail=f"Approach {approach} is not available")
 
     result, latency_ms = await use_case.execute(req.query, req.top_k, approach)

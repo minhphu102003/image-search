@@ -138,12 +138,12 @@ log_format: str = "json"  # "json" or "text"
 
 ## 5. Acceptance Criteria
 
-- [ ] `/metrics` returns valid Prometheus text format
-- [ ] `image_ingest_processed_total` increments after each image
-- [ ] `image_search_latency_seconds` records correct latency
-- [ ] `/health` returns `{"status": "ok"}` when all services connected
-- [ ] `/health` returns `{"status": "degraded"}` when Redis/PG unreachable
-- [ ] Logs are valid JSON with `timestamp`, `level`, `event` fields
+- [x] `/metrics` returns valid Prometheus text format
+- [x] `image_ingest_processed_total` increments after each image
+- [x] `image_search_latency_seconds` records correct latency
+- [x] `/health` returns `{"status": "ok"}` when all services connected
+- [x] `/health` returns `{"status": "degraded"}` when Redis/PG unreachable
+- [x] Logs are valid JSON with `timestamp`, `level`, `event` fields
 - [ ] Grafana dashboard loads with all panels
 
 ---

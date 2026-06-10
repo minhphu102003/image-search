@@ -4,6 +4,10 @@ import structlog
 
 from image_search.domain.embedding_service import EmbeddingService
 from image_search.domain.search_approach import SearchApproach, SearchResponse
+from image_search.infrastructure.observability.metrics import (
+    SEARCH_LATENCY,
+    SEARCH_REQUESTS,
+)
 
 logger = structlog.get_logger()
 
@@ -21,7 +25,12 @@ class SearchImagesUseCase:
         search_approach = self.approaches[approach]
         result = await search_approach.search(query_vector, top_k, query)
 
-        latency_ms = (time.time() - start) * 1000
+        latency_s = time.time() - start
+        latency_ms = latency_s * 1000
+
+        SEARCH_REQUESTS.labels(approach=str(approach)).inc()
+        SEARCH_LATENCY.labels(approach=str(approach)).observe(latency_s)
+
         logger.info("search_completed", approach=approach, results=len(result.images), latency_ms=latency_ms)
 
         return result, latency_ms

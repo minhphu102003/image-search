@@ -8,6 +8,11 @@ from image_search.domain.embedding_service import EmbeddingService
 from image_search.domain.entities import ImageEmbedding, ImageStatus
 from image_search.domain.events import EventBus, ImageIndexedEvent, ImageUploadedEvent
 from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
+from image_search.infrastructure.observability.metrics import (
+    INGEST_DURATION,
+    INGEST_FAILED,
+    INGEST_PROCESSED,
+)
 
 logger = structlog.get_logger()
 
@@ -26,8 +31,11 @@ class IngestWorkerUseCase:
         self.caption_service = caption_service
 
     async def execute(self, event: ImageUploadedEvent) -> None:
+        import time
+
         image_id = event.image_id
         logger.info("ingest_started", image_id=image_id)
+        start = time.time()
 
         try:
             # Step 1: Generate image embedding
@@ -69,9 +77,13 @@ class IngestWorkerUseCase:
                 ImageIndexedEvent(image_id=image_id, status="indexed"),
             )
 
+            INGEST_DURATION.observe(time.time() - start)
+            INGEST_PROCESSED.inc()
             logger.info("ingest_completed", image_id=image_id)
 
         except Exception as e:
+            INGEST_DURATION.observe(time.time() - start)
+            INGEST_FAILED.labels(error_type=type(e).__name__).inc()
             logger.error("ingest_failed", image_id=image_id, error=str(e))
             await self.repository.update_status(image_id, ImageStatus.FAILED.value, str(e))
             await self.event_bus.emit(

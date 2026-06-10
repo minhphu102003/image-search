@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     caption_enabled: bool = False
     gemini_api_key: str | None = None
 
+    # Observability
+    metrics_enabled: bool = True
+    log_level: str = "INFO"
+    log_format: str = "json"
+
     model_config = {"env_prefix": "IMAGE_SEARCH_"}
 
 

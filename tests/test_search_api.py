@@ -152,10 +152,19 @@ async def test_api_search_returns_200(mock_use_case: AsyncMock) -> None:
 
 @pytest.mark.asyncio
 async def test_api_health_endpoint() -> None:
+    from unittest.mock import AsyncMock, patch
+
     from image_search.adapters.input.app import app
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/health")
+    with (
+        patch("image_search.adapters.input.health._check_redis", new_callable=AsyncMock, return_value="ok"),
+        patch("image_search.adapters.input.health._check_postgresql", new_callable=AsyncMock, return_value="ok"),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["checks"]["redis"] == "ok"
+    assert body["checks"]["postgresql"] == "ok"
