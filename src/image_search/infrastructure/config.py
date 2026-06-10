@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     caption_enabled: bool = False
     gemini_api_key: str | None = None
 
+    # MinIO / S3 storage
+    minio_endpoint: str = "minio:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "images"
+    minio_secure: bool = False
+
     # Observability
     metrics_enabled: bool = True
     log_level: str = "INFO"

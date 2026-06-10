@@ -1,5 +1,9 @@
-import torch  # type: ignore[import-not-found]
+import os
+import tempfile
+
+import httpx
 import structlog
+import torch  # type: ignore[import-not-found]
 from PIL import Image  # type: ignore[import-not-found]
 from transformers import AutoModel, AutoProcessor  # type: ignore[import-not-found]
 
@@ -24,8 +28,22 @@ class SigLIPEmbeddingService(EmbeddingService):
         self.processor = AutoProcessor.from_pretrained(model_name)
         logger.info("siglip_model_loaded", model=model_name)
 
+    @staticmethod
+    async def _load_image(image_path: str) -> "Image.Image":
+        if image_path.startswith("http://") or image_path.startswith("https://"):
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(image_path, follow_redirects=True)
+                resp.raise_for_status()
+            tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+            tmp.write(resp.content)
+            tmp.close()
+            image = Image.open(tmp.name).convert("RGB")
+            os.unlink(tmp.name)
+            return image
+        return Image.open(image_path).convert("RGB")
+
     async def embed_image(self, image_path: str) -> list[float]:
-        image = Image.open(image_path).convert("RGB")
+        image = await self._load_image(image_path)
         inputs = self.processor(images=image, return_tensors="pt").to(self.device)
         with torch.no_grad():
             outputs = self.model.get_image_features(**inputs)
@@ -40,7 +58,7 @@ class SigLIPEmbeddingService(EmbeddingService):
         return result
 
     async def embed_images_batch(self, image_paths: list[str]) -> list[list[float]]:
-        images = [Image.open(p).convert("RGB") for p in image_paths]
+        images = [await self._load_image(p) for p in image_paths]
         inputs = self.processor(images=images, return_tensors="pt").to(self.device)
         with torch.no_grad():
             outputs = self.model.get_image_features(**inputs)
