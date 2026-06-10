@@ -52,7 +52,7 @@ def get_approaches(
     approaches: dict[int, SearchApproach] = {}
 
     try:
-        from image_search.infrastructure.approaches.pure_clip import PureClipApproach  # type: ignore[import-untyped]
+        from image_search.infrastructure.approaches.pure_clip import PureClipApproach
 
         approaches[1] = PureClipApproach(repo)
     except ImportError:

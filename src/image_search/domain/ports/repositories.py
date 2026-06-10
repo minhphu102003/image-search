@@ -29,3 +29,9 @@ class ImageEmbeddingRepositoryPort(ABC):
     @abstractmethod
     async def update_caption(self, image_id: str, caption: str, caption_embedding: list[float]) -> None:
         raise NotImplementedError
+
+    @abstractmethod
+    async def search_by_embedding_with_scores(
+        self, query_embedding: list[float], limit: int = 10, user_id: str | None = None
+    ) -> list[tuple[ImageEmbedding, float]]:
+        raise NotImplementedError
