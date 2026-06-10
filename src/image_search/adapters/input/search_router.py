@@ -66,7 +66,7 @@ def get_approaches(
         pass
 
     try:
-        from image_search.infrastructure.approaches.multimodal_rag import MultimodalRAGApproach  # type: ignore[import-untyped]
+        from image_search.infrastructure.approaches.multimodal_rag import MultimodalRAGApproach
 
         if settings.gemini_api_key:
             approaches[3] = MultimodalRAGApproach(repo, settings.gemini_api_key)
