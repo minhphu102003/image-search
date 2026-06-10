@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -12,6 +13,11 @@ from image_search.infrastructure.database.models import Base
 
 config = context.config
 target_metadata = Base.metadata
+
+# Override sqlalchemy.url from env var if set (used in Docker)
+db_url = os.environ.get("IMAGE_SEARCH_DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 
 def run_migrations_offline() -> None:
