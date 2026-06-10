@@ -15,7 +15,7 @@ class IngestImageUseCase:
         embedding: list[float],
         file_path: str,
         user_id: str,
-        model_name: str = "siglip2-384",
+        model_name: str = "jina-embeddings-v4",
         caption: str | None = None,
         caption_embedding: list[float] | None = None,
     ) -> ImageEmbedding:

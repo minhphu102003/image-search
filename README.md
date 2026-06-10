@@ -1,6 +1,6 @@
 # Beekid Image Search
 
-Text-to-image search service for the Beekid education platform. Uses SigLIP 2 embeddings stored in PostgreSQL + pgvector, with MinIO for image storage and Redis Streams for event-driven processing.
+Text-to-image search service for the Beekid education platform. Uses Jina AI cloud embeddings stored in PostgreSQL + pgvector, with MinIO for image storage and Redis Streams for event-driven processing.
 
 ## Quick Start (Docker)
 
@@ -15,7 +15,7 @@ This starts 7 services:
 - **MinIO init** (creates bucket, runs once)
 - **DB migrate** (runs Alembic, runs once)
 - **API server** (port 8000)
-- **Ingest worker** (SigLIP 2 embeddings)
+- **Ingest worker** (Jina AI embeddings + Gemini captions)
 
 Verify:
 
@@ -33,7 +33,7 @@ curl -X POST http://localhost:8000/api/v1/upload \
 # {"image_id": "uuid", "status": "uploaded"}
 ```
 
-The image is stored in MinIO and an event is published to Redis. The ingest worker automatically downloads the image, generates a SigLIP 2 embedding, and saves it to PostgreSQL.
+The image is stored in MinIO and an event is published to Redis. The ingest worker automatically downloads the image, generates a Jina AI embedding, and saves it to PostgreSQL.
 
 ## Search
 
@@ -63,7 +63,7 @@ curl -X POST http://localhost:8000/api/v1/image-search \
 
 ```bash
 # Install
-uv sync --extra ai --extra dev
+uv sync --extra dev
 
 # Env vars
 cp .env.example .env
@@ -118,13 +118,15 @@ graph LR
         Repo[SQLAlchemy Repo]
         EventBus[Redis EventBus]
         MinIO[MinIO Storage]
-        SigLIP[SigLIP Service]
+        Jina[Jina Embedding Service]
+        Gemini[Gemini Caption Service]
     end
     subgraph Infrastructure
         DB[(PostgreSQL + pgvector)]
         Redis[(Redis Streams)]
         S3[(MinIO)]
-        AI[SigLIP 2 Model]
+        CloudAI[Jina AI API]
+        CloudVLM[Gemini API]
     end
 
     REST --> UC
@@ -134,11 +136,13 @@ graph LR
     Repo --> Port
     EventBus --> Port
     MinIO --> Port
-    SigLIP --> Port
+    Jina --> Port
+    Gemini --> Port
     Repo --> DB
     EventBus --> Redis
     MinIO --> S3
-    SigLIP --> AI
+    Jina --> CloudAI
+    Gemini --> CloudVLM
 ```
 
 **Data flow — Upload & Search:**
@@ -150,7 +154,8 @@ sequenceDiagram
     participant M as MinIO
     participant R as Redis Stream
     participant W as Worker
-    participant S as SigLIP 2
+    participant J as Jina AI API
+    participant G as Gemini API
     participant PG as PostgreSQL
 
     rect rgb(220, 240, 255)
@@ -162,17 +167,21 @@ sequenceDiagram
     API-->>C: {image_id, status: "uploaded"}
     R->>W: Consume event
     W->>M: Download image from URL
-    W->>S: embed_image()
-    S-->>W: 1024-dim vector
-    W->>PG: INSERT embedding
+    W->>J: embed_image()
+    J-->>W: 1024-dim vector
+    W->>G: generate_caption()
+    G-->>W: caption text
+    W->>J: embed_text(caption)
+    J-->>W: 1024-dim caption vector
+    W->>PG: INSERT embedding + caption_embedding
     W->>R: XADD image:indexed
     end
 
     rect rgb(220, 255, 220)
     Note over C,PG: Search Flow
     C->>API: POST /api/v1/image-search {query}
-    API->>S: embed_text(query)
-    S-->>API: 1024-dim vector
+    API->>J: embed_text(query)
+    J-->>API: 1024-dim vector
     API->>PG: cosine similarity search
     PG-->>API: top-k results
     API-->>C: [{image_id, file_path, score}]

@@ -44,7 +44,7 @@ def _make_entity(**overrides) -> ImageEmbedding:
         "image_id": f"img-{uuid.uuid4().hex[:8]}",
         "embedding": [0.1] * 1024,
         "caption_embedding": None,
-        "model_name": "siglip2-384",
+        "model_name": "jina-embeddings-v4",
         "caption": None,
         "file_path": "/images/test.jpg",
         "user_id": "user-1",

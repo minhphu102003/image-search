@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Beekid AI Platform — a Vietnamese education platform. This repo contains the **Image Search Service** module: text-to-image retrieval using SigLIP 2 embeddings stored in PostgreSQL + pgvector. The service is part of a larger event-driven system where a NestJS backend emits events via Redis Streams, and Python AI workers consume them.
+Beekid AI Platform — a Vietnamese education platform. This repo contains the **Image Search Service** module: text-to-image retrieval using Jina AI cloud embeddings stored in PostgreSQL + pgvector. The service is part of a larger event-driven system where a NestJS backend emits events via Redis Streams, and Python AI workers consume them.
 
 ## Commands
 
 **Quick shortcuts via Makefile** (run `make help` for full list):
 
 ```bash
-make install          # install all deps (core + dev + ai)
+make install          # install all deps (core + dev)
 make check            # run all quality gates (lint + format-check + typecheck + test)
 make test             # unit tests only (skip integration)
 make lint             # ruff check
@@ -32,7 +32,6 @@ make clean            # remove caches
 # Install dependencies (use uv, not pip)
 uv sync                           # core deps
 uv sync --extra dev               # + pytest, ruff, mypy
-uv sync --extra ai                # + torch, transformers, pillow
 
 # Quality gates
 uv run pytest                                                     # all tests
@@ -87,19 +86,19 @@ Beekid/
 **Dependency flow:** `adapters/input` → `application` → `domain` ← `adapters/output` ← `infrastructure`. Domain has zero outward dependencies.
 
 **Key tech decisions:**
-- `Vector(1024)` for SigLIP 2 image embeddings, `Vector(768)` for optional caption text embeddings
+- `Vector(1024)` for Jina AI image and caption embeddings (unified dimensions)
 - HNSW indexes with `vector_cosine_ops` for similarity search
 - Async SQLAlchemy 2.0 with `asyncpg` driver
 - Alembic `env.py` uses `asyncio.run()` for async migration execution and reads `IMAGE_SEARCH_DATABASE_URL` env var
 - Test DB is separate (`beekid_ai_test`), configured in `tests/conftest.py`
-- MinIO (S3-compatible) for image storage; SigLIP service handles both local paths and HTTP URLs
+- MinIO (S3-compatible) for image storage; Jina AI service handles both local paths and HTTP URLs
 - All config via pydantic-settings with `IMAGE_SEARCH_` env prefix
 
 **Event-driven integration:** Redis Streams connect this service to the NestJS backend.
 - `image:uploaded` (inbound): upload endpoint publishes, ingest worker consumes
 - `image:indexed` (outbound): ingest worker publishes after embedding
 
-**Docker services:** postgres (pgvector:pg16), redis (7-alpine), minio, minio-init, migrate (run-once), api (uvicorn:8000), worker (SigLIP 2 + Redis)
+**Docker services:** postgres (pgvector:pg16), redis (7-alpine), minio, minio-init, migrate (run-once), api (uvicorn:8000), worker (Jina AI + Gemini + Redis)
 
 ## API Endpoints
 

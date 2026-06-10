@@ -5,8 +5,8 @@ help: ## Show this help
 
 # ── Setup ──
 
-install: ## Install all deps (core + dev + ai)
-	uv sync --extra dev --extra ai
+install: ## Install all deps (core + dev)
+	uv sync --extra dev
 
 install-core: ## Install core deps only
 	uv sync
@@ -14,7 +14,7 @@ install-core: ## Install core deps only
 # ── Quality Gates ──
 
 test: ## Run unit tests (skip integration that need DB/Redis)
-	uv run pytest --ignore=tests/test_siglip_service.py --ignore=tests/test_models.py --ignore=tests/test_repositories.py --ignore=tests/test_redis_event_bus.py
+	uv run pytest --ignore=tests/test_models.py --ignore=tests/test_repositories.py --ignore=tests/test_redis_event_bus.py
 
 test-all: ## Run all tests (needs local DB + Redis)
 	uv run pytest

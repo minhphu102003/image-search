@@ -4,8 +4,8 @@ import structlog
 
 from image_search.adapters.output.sqlalchemy_repo import SqlAlchemyImageEmbeddingRepository
 from image_search.application.ingest_worker import IngestWorkerUseCase
+from image_search.domain.embedding_service import EmbeddingService
 from image_search.domain.events import ImageUploadedEvent
-from image_search.infrastructure.ai.siglip_service import SigLIPEmbeddingService
 from image_search.infrastructure.config import settings
 from image_search.infrastructure.database.connection import async_session
 from image_search.infrastructure.redis.event_bus import RedisEventBus
@@ -13,12 +13,23 @@ from image_search.infrastructure.redis.event_bus import RedisEventBus
 logger = structlog.get_logger()
 
 
+def _create_embedding_service() -> EmbeddingService:
+    """Create Jina AI embedding service."""
+    if not settings.jina_api_key:
+        raise ValueError("IMAGE_SEARCH_JINA_API_KEY is required")
+    from image_search.infrastructure.ai.jina_service import JinaEmbeddingService
+
+    return JinaEmbeddingService(
+        api_key=settings.jina_api_key,
+        model=settings.jina_model,
+        api_url=settings.jina_api_url,
+        dimensions=settings.jina_dimensions,
+    )
+
+
 async def main() -> None:
     event_bus = RedisEventBus(settings.redis_url)
-    embedding_service = SigLIPEmbeddingService(
-        model_name=settings.siglip_model,
-        device=settings.siglip_device,
-    )
+    embedding_service = _create_embedding_service()
 
     caption_service = None
     if settings.caption_enabled and settings.gemini_api_key:

@@ -53,7 +53,7 @@ class IngestWorkerUseCase:
                 image_id=image_id,
                 embedding=embedding,
                 caption_embedding=None,
-                model_name="siglip2-384",
+                model_name="jina-embeddings-v4",
                 caption=None,
                 file_path=event.file_path,
                 user_id=event.user_id,

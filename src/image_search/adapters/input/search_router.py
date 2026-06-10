@@ -44,9 +44,16 @@ class SearchResponseSchema(BaseModel):
 
 @lru_cache
 def get_embedding_service() -> EmbeddingService:
-    from image_search.infrastructure.ai.siglip_service import SigLIPEmbeddingService
+    if not settings.jina_api_key:
+        raise ValueError("IMAGE_SEARCH_JINA_API_KEY is required")
+    from image_search.infrastructure.ai.jina_service import JinaEmbeddingService
 
-    return SigLIPEmbeddingService(model_name=settings.siglip_model, device=settings.siglip_device)
+    return JinaEmbeddingService(
+        api_key=settings.jina_api_key,
+        model=settings.jina_model,
+        api_url=settings.jina_api_url,
+        dimensions=settings.jina_dimensions,
+    )
 
 
 def get_approaches(

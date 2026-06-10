@@ -5,10 +5,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/beekid_ai"
     redis_url: str = "redis://localhost:6379"
 
-    # SigLIP 2 embedding
-    siglip_model: str = "google/siglip2-so400m-patch16-384"
-    siglip_device: str | None = None
-    embed_batch_size: int = 8
+    # Jina AI cloud embedding
+    jina_api_key: str | None = None
+    jina_model: str = "jina-embeddings-v4"
+    jina_api_url: str = "https://api.jina.ai/v1/embeddings"
+    jina_dimensions: int = 1024
 
     # pgvector HNSW parameters
     hnsw_m: int = 16
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     worker_id: str = "1"
     caption_enabled: bool = False
     gemini_api_key: str | None = None
+    caption_prompt: str = ""
 
     # MinIO / S3 storage
     minio_endpoint: str = "minio:9000"
@@ -37,7 +39,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "json"
 
-    model_config = {"env_prefix": "IMAGE_SEARCH_"}
+    model_config = {"env_prefix": "IMAGE_SEARCH_", "env_file": ".env", "env_file_encoding": "utf-8"}
 
 
 settings = Settings()

@@ -79,7 +79,7 @@ sequenceDiagram
     User->>BE: Upload image
     BE->>RS: 5. image:uploaded
     RS-->>Img: consume
-    Img->>Img: CLIP/SigLIP embed + (opt) Gemini caption
+    Img->>Img: Jina AI embed + Gemini caption
     Img->>RS: 6. image:indexed
     RS-->>BE: consume
     BE->>User: Image indexed

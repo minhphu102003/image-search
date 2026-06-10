@@ -24,10 +24,10 @@ EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "image_search.adapters.input.app:app", \
      "--host", "0.0.0.0", "--port", "8000"]
 
-# ── Worker target: includes torch + transformers ──
+# ── Worker target: core deps (Jina cloud API + Gemini caption) ──
 FROM base AS worker
 
-RUN uv sync --frozen --no-dev --extra ai
+RUN uv sync --frozen --no-dev
 
 CMD ["uv", "run", "python", "-m", "image_search.adapters.input.ingest_worker"]
 

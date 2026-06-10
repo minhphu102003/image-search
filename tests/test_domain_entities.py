@@ -16,8 +16,8 @@ def test_image_embedding_creation():
         id="uuid-1",
         image_id="img-001",
         embedding=[0.1] * 1024,
-        caption_embedding=[0.2] * 768,
-        model_name="siglip2-384",
+        caption_embedding=[0.2] * 1024,
+        model_name="jina-embeddings-v4",
         caption="A red car",
         file_path="/images/car.jpg",
         user_id="user-1",
@@ -28,7 +28,7 @@ def test_image_embedding_creation():
     )
     assert entity.id == "uuid-1"
     assert len(entity.embedding) == 1024
-    assert len(entity.caption_embedding) == 768
+    assert len(entity.caption_embedding) == 1024
     assert entity.status == ImageStatus.INDEXED
 
 
@@ -39,7 +39,7 @@ def test_image_embedding_nullable_caption():
         image_id="img-002",
         embedding=[0.0] * 1024,
         caption_embedding=None,
-        model_name="siglip2-384",
+        model_name="jina-embeddings-v4",
         caption=None,
         file_path="/images/dog.jpg",
         user_id="user-1",

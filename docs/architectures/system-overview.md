@@ -81,7 +81,7 @@ flowchart TB
 
     subgraph Img["MODULE: Image Search"]
         sub_img[Image Search Service]
-        sub_img --> CLIP[SigLIP/CLIP local]
+        sub_img --> Jina[Jina AI cloud]
         sub_img --> PG
         sub_img --> LLM2[Gemini - optional]
     end
@@ -229,7 +229,7 @@ flowchart LR
 | **Event Bus** | Redis Stream | $0 (có sẵn) |
 | **Vector Search** | pgvector | $0 (trong PostgreSQL) |
 | **LLM** | Gemini 2.0/2.5 Flash | $0 (free tier) / ~$0.15/1M tokens |
-| **Image Embedding** | SigLIP 2 (local) | $0 |
+| **Image Embedding** | Jina AI (cloud API) | ~$0.0001/image |
 | **Image Caption** | Gemini 2.0 Flash | $0 (free tier) |
 | **TTS (default)** | Google Cloud TTS | $0 (1M chars free/tháng) |
 | **TTS (optional)** | XTTS v2 (self-host) | $0 (cần GPU) |

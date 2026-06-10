@@ -35,7 +35,7 @@ def _make_embedding_model(**overrides) -> ImageEmbeddingModel:
         "id": str(uuid.uuid4()),
         "image_id": f"img-{uuid.uuid4().hex[:8]}",
         "embedding": [0.1] * 1024,
-        "model_name": "siglip2-384",
+        "model_name": "jina-embeddings-v4",
         "file_path": "/images/test.jpg",
         "user_id": "user-1",
         "status": "PENDING",

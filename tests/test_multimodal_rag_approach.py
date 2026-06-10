@@ -24,7 +24,7 @@ def _emb(image_id: str, file_path: str = "/img.jpg", caption: str | None = None)
         image_id=image_id,
         embedding=[0.1] * 1024,
         caption_embedding=None,
-        model_name="siglip2-so400m-patch16-384",
+        model_name="jina-embeddings-v4",
         caption=caption,
         file_path=file_path,
         user_id="user-1",

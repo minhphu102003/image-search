@@ -1,16 +1,10 @@
 import structlog
 
+from image_search.domain.prompts import RAG_SYSTEM_PROMPT
 from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
 from image_search.domain.search_approach import SearchApproach, SearchResponse, SearchResult
 
 logger = structlog.get_logger()
-
-SYSTEM_PROMPT = """You are an image analysis assistant for an education platform.
-Given a set of images and a user question:
-1. Identify which images are relevant to the question
-2. Describe what you see in the relevant images
-3. Provide a concise, informative answer grounded in the images
-4. Reference specific images by their position (Image 1, Image 2, etc.)"""
 
 
 class MultimodalRAGApproach(SearchApproach):
@@ -21,12 +15,12 @@ class MultimodalRAGApproach(SearchApproach):
         top_k_retrieve: int = 5,
         gemini_model: str = "gemini-2.0-flash",
     ) -> None:
-        import google.generativeai as genai  # type: ignore[import-not-found]
+        import google.generativeai as genai
 
         self.repository = repository
         self.top_k_retrieve = top_k_retrieve
         genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel(gemini_model, system_instruction=SYSTEM_PROMPT)
+        self.model = genai.GenerativeModel(gemini_model, system_instruction=RAG_SYSTEM_PROMPT)
 
     async def search(self, query_vector: list[float], top_k: int, query_text: str) -> SearchResponse:
         rows = await self.repository.search_by_embedding_with_scores(
@@ -53,7 +47,7 @@ class MultimodalRAGApproach(SearchApproach):
         return SearchResponse(images=images, answer=answer)
 
     def _load_images(self, images: list[SearchResult]) -> list[object]:
-        from PIL import Image  # type: ignore[import-not-found]
+        from PIL import Image
 
         parts: list[object] = []
         for img in images:

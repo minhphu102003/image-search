@@ -13,7 +13,7 @@ flowchart TB
 
     subgraph Ingest["IMAGE INGEST WORKER"]
         RS -->|subscribe: image:uploaded| W1[Image Ingest Worker]
-        W1 --> A2[CLIP/SigLIP Embed local]
+        W1 --> A2[Jina AI Embed (cloud)]
         A2 --> A3[pgvector: image_embeddings]
         A3 --> A4[Optional: Gemini caption -> text embed]
         A4 --> A5[Status: INDEXED]
@@ -21,7 +21,7 @@ flowchart TB
     end
 
     subgraph Search["IMAGE SEARCH SERVICE"]
-        B1[API: search by text prompt] --> B2[CLIP/SigLIP Embed local]
+        B1[API: search by text prompt] --> B2[Jina AI Embed (cloud)]
         B2 --> B3{Approach}
         B3 -->|1 Pure CLIP| B4[pgvector cosine search]
         B3 -->|2 Hybrid Caption| B5[pgvector CLIP + text -> RRF]
@@ -63,7 +63,7 @@ flowchart LR
     end
 
     subgraph Embed["2. Embed"]
-        B --> C1[CLIP/SigLIP local -> embedding vector 1024d]
+        B --> C1[Jina AI cloud -> embedding vector 1024d]
         C1 --> D1[Save vector -> image_embeddings table]
     end
 
@@ -90,12 +90,12 @@ Config-driven: chỉ cần thay đổi `ImageSearch.Approach = 1 | 2 | 3`.
 ```mermaid
 flowchart TB
     subgraph Common["Common Steps"]
-        A["Text Prompt"] --> B["CLIP/SigLIP embed local"]
+        A["Text Prompt"] --> B["Jina AI embed (cloud)"]
         B --> C["vector(1024)"]
     end
 
     subgraph A1["Approach 1: Pure CLIP ($0)"]
-        C --> D1["pgvector cosine search: image_embeddings WHERE model_name=siglip2-384"]
+        C --> D1["pgvector cosine search: image_embeddings WHERE model_name=jina-embeddings-v4"]
         D1 --> E1["Return Top-K: image_id + url + score"]
     end
 
@@ -120,7 +120,7 @@ flowchart TB
 sequenceDiagram
     participant User as User
     participant API as ImageSearchController
-    participant Clip as CLIP/SigLIP (local)
+    participant Clip as Jina AI (cloud)
     participant Pg as PostgreSQL pgvector
     participant Gemini as Gemini API (opt)
 
@@ -173,7 +173,7 @@ flowchart TB
 
     subgraph Worker["IMAGE INGEST WORKER"]
         RS -->|image:uploaded| ImgWorker[Image Ingest Worker]
-        ImgWorker --> Clip[CLIP/SigLIP local]
+        ImgWorker --> Clip[Jina AI cloud]
         ImgWorker --> GeminiOpt[Gemini - optional]
         ImgWorker --> Pg
         ImgWorker --> RS
@@ -181,7 +181,7 @@ flowchart TB
 
     subgraph SearchSvc["IMAGE SEARCH SERVICE"]
         BEApi --> ImgSearch[Image Search Service]
-        ImgSearch --> Clip2[CLIP/SigLIP local]
+        ImgSearch --> Clip2[Jina AI cloud]
         ImgSearch --> Gemini[Gemini API - opt]
         ImgSearch --> Pg
     end
@@ -207,7 +207,7 @@ flowchart TB
 | Component | Cong nghe | Cost |
 |---|---|---|
 | **Backend** | BE Nest (Node.js/NestJS) | $0 |
-| **Image Embedding** | SigLIP 2 (local, open-source) | $0 |
+| **Image Embedding** | Jina AI (cloud API) | ~$0.0001/image |
 | **Vector Store** | PostgreSQL + pgvector | $0 (da co) |
 | **LLM Caption/Answer** | Gemini 2.0 Flash | $0 (free) hoac ~$0.00004/req |
 | **Event Bus** | Redis Stream | $0 (da co hoac tu host) |
@@ -217,9 +217,9 @@ flowchart TB
 
 | Model | Dim | Quality | Speed | Source |
 |---|---|---|---|---|
+| `jina-embeddings-v4` | 1024 | High | Fast (cloud) | Jina AI |
 | `clip-ViT-B-32` | 512 | 63% ImageNet | Nhanh | OpenAI |
 | `clip-ViT-L-14` | 768 | 75% ImageNet | Trung binh | OpenAI |
-| `ViT-SO400M-16-SigLIP2-384` | 1024 | ~82% ImageNet | Cham nhat | Google (top 1) |
 
 ---
 
