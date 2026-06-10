@@ -30,15 +30,21 @@ async def main() -> None:
 
     async def handle_event(payload: dict[str, object]) -> None:
         event = ImageUploadedEvent(**payload)  # type: ignore[arg-type]
-        async with async_session() as session:
-            repository = SqlAlchemyImageEmbeddingRepository(session)
-            use_case = IngestWorkerUseCase(
-                repository=repository,
-                embedding_service=embedding_service,
-                event_bus=event_bus,
-                caption_service=caption_service,
-            )
-            await use_case.execute(event)
+        structlog.contextvars.bind_contextvars(image_id=event.image_id)
+        logger.info("event_received", stream="image:uploaded", image_id=event.image_id, user_id=event.user_id)
+        try:
+            async with async_session() as session:
+                repository = SqlAlchemyImageEmbeddingRepository(session)
+                use_case = IngestWorkerUseCase(
+                    repository=repository,
+                    embedding_service=embedding_service,
+                    event_bus=event_bus,
+                    caption_service=caption_service,
+                )
+                await use_case.execute(event)
+            logger.info("event_processed", image_id=event.image_id)
+        finally:
+            structlog.contextvars.unbind_contextvars("image_id")
 
     await event_bus.consume(
         stream="image:uploaded",

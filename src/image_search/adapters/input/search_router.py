@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -11,6 +12,7 @@ from image_search.infrastructure.config import settings
 from image_search.infrastructure.database.connection import async_session
 from image_search.infrastructure.observability.metrics import SEARCH_ERRORS
 
+logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1", tags=["search"])
 
 
@@ -100,7 +102,9 @@ async def search_images(
         SEARCH_ERRORS.labels(error_type="invalid_approach").inc()
         raise HTTPException(status_code=400, detail=f"Approach {approach} is not available")
 
+    logger.info("search_started", query=req.query[:80], approach=approach, top_k=req.top_k)
     result, latency_ms = await use_case.execute(req.query, req.top_k, approach)
+    logger.info("search_completed", approach=approach, results=len(result.images), latency_ms=round(latency_ms, 1))
 
     return SearchResponseSchema(
         images=[
