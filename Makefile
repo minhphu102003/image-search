@@ -1,4 +1,4 @@
-.PHONY: help install test lint format typecheck migrate migrate-new docker-up docker-down docker-build docker-logs clean
+.PHONY: help install test lint format typecheck migrate migrate-new docker-up docker-down docker-build docker-logs docker-local-up docker-local-down docker-local-logs clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -72,6 +72,20 @@ docker-logs-worker: ## Tail worker logs
 
 docker-restart: ## Rebuild and restart
 	docker compose build && docker compose up -d
+
+# ── Local Dev (infra in Docker, API+Worker via uv) ──
+
+dev-up: ## Start local dev: infra → API → Worker (run in separate terminals)
+	docker compose -f docker/docker-compose.local.yml up -d
+	@echo ""
+	@echo "=== Infra ready. Run these in separate terminals: ==="
+	@echo "  uv run uvicorn image_search.adapters.input.app:app --host 0.0.0.0 --port 8000 --reload"
+	@echo "  uv run python -m image_search.adapters.input.ingest_worker"
+	@echo ""
+
+dev-down: ## Stop local dev: docker infra + kill API/worker
+	docker compose -f docker/docker-compose.local.yml down
+	-powershell -Command "Get-Process -Name python -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -like '*uvicorn*' -or $_.CommandLine -like '*ingest_worker*'} | Stop-Process -Force" 2>$null || true
 
 # ── Run Locally (without Docker) ──
 

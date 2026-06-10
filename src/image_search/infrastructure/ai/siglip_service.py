@@ -31,6 +31,7 @@ class SigLIPEmbeddingService(EmbeddingService):
     @staticmethod
     async def _load_image(image_path: str) -> "Image.Image":
         if image_path.startswith("http://") or image_path.startswith("https://"):
+            logger.debug("loading_image_from_url", url=image_path[:120])
             async with httpx.AsyncClient() as client:
                 resp = await client.get(image_path, follow_redirects=True)
                 resp.raise_for_status()
@@ -39,8 +40,12 @@ class SigLIPEmbeddingService(EmbeddingService):
             tmp.close()
             image = Image.open(tmp.name).convert("RGB")
             os.unlink(tmp.name)
+            logger.debug("image_loaded", source="url", size=f"{image.width}x{image.height}", bytes=len(resp.content))
             return image
-        return Image.open(image_path).convert("RGB")
+        logger.debug("loading_image_from_path", path=image_path)
+        image = Image.open(image_path).convert("RGB")
+        logger.debug("image_loaded", source="local", size=f"{image.width}x{image.height}")
+        return image
 
     async def embed_image(self, image_path: str) -> list[float]:
         image = await self._load_image(image_path)
@@ -48,6 +53,12 @@ class SigLIPEmbeddingService(EmbeddingService):
         with torch.no_grad():
             outputs = self.model.get_image_features(**inputs)
         result: list[float] = outputs[0].cpu().tolist()
+        logger.debug(
+            "image_embedded",
+            path=image_path,
+            dim=len(result),
+            sample=[round(v, 4) for v in result[:5]],
+        )
         return result
 
     async def embed_text(self, text: str) -> list[float]:
@@ -55,6 +66,12 @@ class SigLIPEmbeddingService(EmbeddingService):
         with torch.no_grad():
             outputs = self.model.get_text_features(**inputs)
         result: list[float] = outputs[0].cpu().tolist()
+        logger.debug(
+            "text_embedded",
+            text_preview=text[:80],
+            dim=len(result),
+            sample=[round(v, 4) for v in result[:5]],
+        )
         return result
 
     async def embed_images_batch(self, image_paths: list[str]) -> list[list[float]]:

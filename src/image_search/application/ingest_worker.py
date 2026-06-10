@@ -39,9 +39,14 @@ class IngestWorkerUseCase:
 
         try:
             # Step 1: Generate image embedding
+            t0 = time.time()
             embedding = await self.embedding_service.embed_image(event.file_path)
+            logger.info(
+                "step1_embed_image", image_id=image_id, dim=len(embedding), elapsed_s=round(time.time() - t0, 2)
+            )
 
             # Step 2: Save to database
+            t0 = time.time()
             now = datetime.now(tz=timezone.utc)
             entity = ImageEmbedding(
                 id=str(uuid.uuid4()),
@@ -58,13 +63,22 @@ class IngestWorkerUseCase:
                 updated_at=now,
             )
             await self.repository.save(entity)
+            logger.info("step2_saved_to_db", image_id=image_id, elapsed_s=round(time.time() - t0, 2))
 
             # Step 3: Optional caption generation
             if self.caption_service is not None:
                 try:
+                    t0 = time.time()
                     caption = await self.caption_service.generate_caption(event.file_path)
                     caption_embedding = await self.embedding_service.embed_text(caption)
                     await self.repository.update_caption(image_id, caption, caption_embedding)
+                    logger.info(
+                        "step3_caption_done",
+                        image_id=image_id,
+                        caption=caption,
+                        caption_embedding_dim=len(caption_embedding),
+                        elapsed_s=round(time.time() - t0, 2),
+                    )
                 except Exception as e:
                     logger.warning("caption_failed", image_id=image_id, error=str(e))
 

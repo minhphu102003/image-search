@@ -19,16 +19,32 @@ class GeminiCaptionService(CaptionService):
 
     async def generate_caption(self, image_path: str) -> str:
         import asyncio
+        import time
 
         from PIL import Image  # type: ignore[import-not-found]
 
-        logger.info("generating_caption", image_path=image_path)
         image = Image.open(image_path)
-
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None, lambda: self.model.generate_content(["Describe this image in one sentence.", image])
+        prompt = "Describe this image in one sentence."
+        logger.info(
+            "caption_started",
+            image_path=image_path,
+            image_size=f"{image.width}x{image.height}",
+            image_format=image.format,
+            prompt=prompt,
         )
+
+        start = time.time()
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, lambda: self.model.generate_content([prompt, image]))
+        elapsed = time.time() - start
         caption: str = response.text.strip()
-        logger.info("caption_generated", image_path=image_path, caption=caption)
+
+        logger.info(
+            "caption_completed",
+            image_path=image_path,
+            caption=caption,
+            caption_length=len(caption),
+            elapsed_s=round(elapsed, 2),
+            model=self.model._model_name if hasattr(self.model, "_model_name") else "unknown",
+        )
         return caption
