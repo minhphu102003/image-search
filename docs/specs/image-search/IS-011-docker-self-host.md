@@ -318,14 +318,14 @@ docker compose up -d --scale worker=3
 
 ## 8. Acceptance Criteria
 
-- [ ] `docker compose up` starts all 5 services
-- [ ] PostgreSQL is ready with pgvector extension and `image_embeddings` table
-- [ ] `GET http://localhost:8000/health` returns `{"status": "ok"}`
-- [ ] `POST http://localhost:8000/api/v1/image-search` accepts requests
-- [ ] Worker connects to Redis and consumes `image:uploaded` events
-- [ ] `docker compose down` stops cleanly
-- [ ] `docker compose down -v` destroys volumes
-- [ ] `.env.example` documents all env vars
+- [x] `docker compose up` starts all 5 services
+- [x] PostgreSQL is ready with pgvector extension and `image_embeddings` table
+- [x] `GET http://localhost:8000/health` returns `{"status": "ok"}`
+- [x] `POST http://localhost:8000/api/v1/image-search` accepts requests
+- [x] Worker connects to Redis and consumes `image:uploaded` events
+- [x] `docker compose down` stops cleanly
+- [x] `docker compose down -v` destroys volumes
+- [x] `.env.example` documents all env vars
 
 ---
 

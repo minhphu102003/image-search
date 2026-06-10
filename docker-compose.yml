@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: beekid
+      POSTGRES_PASSWORD: beekid_secret
+      POSTGRES_DB: beekid_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beekid -d beekid_ai"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      IMAGE_SEARCH_DATABASE_URL: postgresql+asyncpg://beekid:beekid_secret@postgres:5432/beekid_ai
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "8000:8000"
+    environment:
+      IMAGE_SEARCH_DATABASE_URL: postgresql+asyncpg://beekid:beekid_secret@postgres:5432/beekid_ai
+      IMAGE_SEARCH_REDIS_URL: redis://redis:6379
+      IMAGE_SEARCH_IMAGE_SEARCH_HOST: "0.0.0.0"
+      IMAGE_SEARCH_IMAGE_SEARCH_PORT: "8000"
+      IMAGE_SEARCH_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      IMAGE_SEARCH_LOG_FORMAT: json
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      IMAGE_SEARCH_DATABASE_URL: postgresql+asyncpg://beekid:beekid_secret@postgres:5432/beekid_ai
+      IMAGE_SEARCH_REDIS_URL: redis://redis:6379
+      IMAGE_SEARCH_WORKER_ID: "1"
+      IMAGE_SEARCH_CAPTION_ENABLED: "false"
+      IMAGE_SEARCH_GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      IMAGE_SEARCH_SIGLIP_DEVICE: cpu
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  redisdata:
