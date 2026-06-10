@@ -117,6 +117,22 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
         result = await self.session.execute(stmt)
         return [(_to_entity(row[0]), float(row[1])) for row in result.all()]
 
+    async def search_caption_embedding_with_scores(
+        self, query_embedding: list[float], limit: int = 10
+    ) -> list[tuple[ImageEmbedding, float]]:
+        distance = ImageEmbeddingModel.caption_embedding.cosine_distance(query_embedding)
+        score = (1 - distance).label("score")
+        stmt = (
+            select(ImageEmbeddingModel, score)
+            .where(ImageEmbeddingModel.status == "INDEXED")
+            .where(ImageEmbeddingModel.caption_embedding.is_not(None))
+            .order_by(distance)
+            .limit(limit)
+        )
+
+        result = await self.session.execute(stmt)
+        return [(_to_entity(row[0]), float(row[1])) for row in result.all()]
+
     async def update_caption(self, image_id: str, caption: str, caption_embedding: list[float]) -> None:
         stmt = (
             update(ImageEmbeddingModel)

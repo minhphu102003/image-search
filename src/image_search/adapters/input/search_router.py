@@ -59,7 +59,7 @@ def get_approaches(
         pass
 
     try:
-        from image_search.infrastructure.approaches.hybrid_caption import HybridCaptionApproach  # type: ignore[import-untyped]
+        from image_search.infrastructure.approaches.hybrid_caption import HybridCaptionApproach
 
         approaches[2] = HybridCaptionApproach(repo)
     except ImportError:
