@@ -8,9 +8,27 @@ Beekid AI Platform — a Vietnamese education platform. This repo contains the *
 
 ## Commands
 
-```bash
-# Quick reference — run `make help` for full list
+**Quick shortcuts via Makefile** (run `make help` for full list):
 
+```bash
+make install          # install all deps (core + dev + ai)
+make check            # run all quality gates (lint + format-check + typecheck + test)
+make test             # unit tests only (skip integration)
+make lint             # ruff check
+make format           # ruff format
+make typecheck        # mypy
+make docker-up        # start all Docker services
+make docker-down      # stop Docker
+make docker-restart   # rebuild and restart
+make run-api          # run API server locally (--reload)
+make run-worker       # run ingest worker locally
+make migrate          # run DB migrations
+make clean            # remove caches
+```
+
+**Full commands (uv / docker):**
+
+```bash
 # Install dependencies (use uv, not pip)
 uv sync                           # core deps
 uv sync --extra dev               # + pytest, ruff, mypy
