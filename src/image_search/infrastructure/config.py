@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     hnsw_ef_construction: int = 64
     hnsw_ef_search: int = 40
 
+    # Connection pool
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+
     # Search
     image_search_approach: int = 1
     min_score_threshold: float = 0.5
