@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Search
     image_search_approach: int = 1
+    min_score_threshold: float = 0.5
     image_search_host: str = "0.0.0.0"
     image_search_port: int = 8000
 

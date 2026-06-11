@@ -3,6 +3,7 @@ import structlog
 from image_search.domain.entities import ImageEmbedding
 from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
 from image_search.domain.search_approach import SearchApproach, SearchResponse, SearchResult
+from image_search.infrastructure.config import settings
 
 logger = structlog.get_logger()
 
@@ -32,15 +33,25 @@ class HybridCaptionApproach(SearchApproach):
         self.rrf_k = rrf_k
 
     async def search(self, query_vector: list[float], top_k: int, query_text: str) -> SearchResponse:
-        clip_results = await self.repository.search_by_embedding_with_scores(
-            query_embedding=query_vector,
-            limit=top_k,
-        )
+        min_score = settings.min_score_threshold
 
-        caption_results = await self.repository.search_caption_embedding_with_scores(
-            query_embedding=query_vector,
-            limit=top_k,
-        )
+        clip_results = [
+            (e, s)
+            for e, s in await self.repository.search_by_embedding_with_scores(
+                query_embedding=query_vector,
+                limit=top_k,
+            )
+            if s >= min_score
+        ]
+
+        caption_results = [
+            (e, s)
+            for e, s in await self.repository.search_caption_embedding_with_scores(
+                query_embedding=query_vector,
+                limit=top_k,
+            )
+            if s >= min_score
+        ]
 
         if not caption_results:
             merged = clip_results

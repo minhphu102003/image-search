@@ -2,6 +2,7 @@ import structlog
 
 from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
 from image_search.domain.search_approach import SearchApproach, SearchResponse, SearchResult
+from image_search.infrastructure.config import settings
 
 logger = structlog.get_logger()
 
@@ -24,6 +25,7 @@ class PureClipApproach(SearchApproach):
                 caption=entity.caption,
             )
             for entity, score in rows
+            if score >= settings.min_score_threshold
         ]
 
         logger.info("pure_clip_search", query_length=len(query_text), top_k=top_k, results=len(images))

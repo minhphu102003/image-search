@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -34,7 +34,7 @@ class TestPureClipApproach:
         repo.search_by_embedding_with_scores = AsyncMock(
             return_value=[
                 (_make_embedding("img-1", "/car.jpg", "a red car"), 0.9234),
-                (_make_embedding("img-2", "/building.jpg"), 0.3456),
+                (_make_embedding("img-2", "/building.jpg"), 0.7456),
             ]
         )
         approach = PureClipApproach(repo)
@@ -48,7 +48,7 @@ class TestPureClipApproach:
         assert result.images[0].score == 0.9234
         assert result.images[0].caption == "a red car"
         assert result.images[1].image_id == "img-2"
-        assert result.images[1].score == 0.3456
+        assert result.images[1].score == 0.7456
         assert result.images[1].caption is None
         assert result.answer is None
 
@@ -56,6 +56,24 @@ class TestPureClipApproach:
             query_embedding=[0.1] * 1024,
             limit=10,
         )
+
+    @pytest.mark.asyncio
+    async def test_filters_low_scores_below_threshold(self) -> None:
+        repo = AsyncMock()
+        repo.search_by_embedding_with_scores = AsyncMock(
+            return_value=[
+                (_make_embedding("img-1", "/car.jpg"), 0.9),
+                (_make_embedding("img-2", "/noise.jpg"), 0.3),
+            ]
+        )
+        approach = PureClipApproach(repo)
+
+        with patch("image_search.infrastructure.approaches.pure_clip.settings") as mock_settings:
+            mock_settings.min_score_threshold = 0.5
+            result = await approach.search([0.1] * 1024, top_k=10, query_text="test")
+
+        assert len(result.images) == 1
+        assert result.images[0].image_id == "img-1"
 
     @pytest.mark.asyncio
     async def test_empty_results(self) -> None:
