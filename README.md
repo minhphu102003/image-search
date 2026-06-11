@@ -4,112 +4,99 @@ Text-to-image search service for the Beekid education platform. Uses Jina AI clo
 
 ## Quick Start (Docker)
 
+### 1. Environment Variables
+
+Create `.env` file (copy from `.env.example`):
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+
+| Variable | Description |
+|---|---|
+| `IMAGE_SEARCH_JINA_API_KEY` | Jina AI API key (get at [jina.ai](https://jina.ai)) |
+| `IMAGE_SEARCH_GEMINI_API_KEY` | Google Gemini API key (for caption generation) |
+
+### 2. Start Services
+
 ```bash
 docker compose up -d
 ```
 
 This starts 7 services:
-- **PostgreSQL** with pgvector (port 5432)
-- **Redis** (port 6379)
-- **MinIO** object storage (API port 9000, console port 9001)
-- **MinIO init** (creates bucket, runs once)
-- **DB migrate** (runs Alembic, runs once)
-- **API server** (port 8000)
-- **Ingest worker** (Jina AI embeddings + Gemini captions)
 
-Verify:
+| Service | Port | Description |
+|---|---|---|
+| postgres | 5432 | PostgreSQL + pgvector |
+| redis | 6379 | Redis Streams |
+| minio | 9000, 9001 | S3-compatible object storage (API, Console) |
+| minio-init | — | Creates bucket (runs once) |
+| migrate | — | Runs Alembic migrations (runs once) |
+| api | 8000 | FastAPI REST server |
+| worker | — | Ingest worker (Jina embeddings + Gemini captions) |
+
+### 3. Verify
 
 ```bash
 curl http://localhost:8000/health
-# {"status": "ok", "checks": {"redis": "ok", "postgresql": "ok"}}
 ```
-
-## Upload an Image
-
-```bash
-curl -X POST http://localhost:8000/api/v1/upload \
-  -F "file=@photo.jpg" \
-  -F "user_id=test-user"
-# {"image_id": "uuid", "status": "uploaded"}
-```
-
-The image is stored in MinIO and an event is published to Redis. The ingest worker automatically downloads the image, generates a Jina AI embedding, and saves it to PostgreSQL.
-
-## Search
-
-```bash
-curl -X POST http://localhost:8000/api/v1/image-search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "a red car", "top_k": 10, "approach": 2}'
-```
-
-Results below `min_score_threshold` (default 0.5) are filtered out.
-
-| Approach | Name | Speed | Cost |
-|----------|------|-------|------|
-| 1 | Pure CLIP | ~50ms | Free |
-| 2 | Hybrid Caption (RRF) | ~200ms | Free |
-| 3 | Multimodal RAG (Gemini) | ~500ms | ~$0.00004/query |
 
 ## API Endpoints
 
 | Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/upload` | Upload image, trigger auto-ingest |
-| POST | `/api/v1/image-search` | Text-to-image search |
-| GET | `/images/{image_id}` | Get image metadata |
-| DELETE | `/images/{image_id}` | Delete image |
-| GET | `/health` | Health check |
+|---|---|---|
+| `POST` | `/api/v1/upload` | Upload image to MinIO, trigger auto-ingest pipeline |
+| `POST` | `/api/v1/image-search` | Text-to-image search (3 approaches: pure CLIP, hybrid caption, multimodal RAG) |
+| `GET` | `/images/{image_id}` | Get image metadata and status |
+| `DELETE` | `/images/{image_id}` | Delete image and its embeddings |
+| `GET` | `/health` | Health check (Redis + PostgreSQL) |
+
+## Search Approaches
+
+| # | Name | How it works | Speed | Cost |
+|---|---|---|---|---|
+| 1 | Pure CLIP | Cosine search on image embedding only | ~50ms | Free |
+| 2 | Hybrid Caption | Cosine on image + caption embeddings, fused with RRF (default) | ~200ms | Free |
+| 3 | Multimodal RAG | Hybrid search + Gemini generates answer from top images | ~500ms | ~$0.00004/query |
+
+Results below `min_score_threshold` (default 0.5) are filtered out.
+
+## Resource Usage (Docker)
+
+Approximate memory usage with Jina cloud API (no local ML models):
+
+| Service | RAM |
+|---|---|
+| worker | ~145 MiB |
+| api | ~116 MiB |
+| minio | ~70 MiB |
+| postgres | ~25 MiB |
+| redis | ~4 MiB |
+| **Total** | **~360 MiB** |
 
 ## Local Development
 
 ```bash
-# Install
-uv sync --extra dev
-
-# Env vars
-cp .env.example .env
-
-# Start infra (PostgreSQL, Redis, MinIO)
-docker compose up -d postgres redis minio minio-init
-
-# Migrate
-uv run alembic upgrade head
-
-# Run API + worker
-uv run uvicorn image_search.adapters.input.app:app --host 0.0.0.0 --port 8000 --reload
-uv run python -m image_search.adapters.input.ingest_worker
+uv sync --extra dev               # install deps
+cp .env.example .env               # configure env vars
+docker compose up -d postgres redis minio minio-init  # start infra
+uv run alembic upgrade head        # run migrations
+uv run uvicorn image_search.adapters.input.app:app --host 0.0.0.0 --port 8000 --reload  # API
+uv run python -m image_search.adapters.input.ingest_worker  # worker
 ```
 
-## Tests
+### Quality Gates
 
 ```bash
-uv run pytest                     # unit tests
-uv run ruff check src/ tests/     # lint
-uv run ruff format src/ tests/    # format
-uv run mypy src/                  # type check
-```
-
-Or use Make:
-
-```bash
-make check       # run all quality gates
+make check       # all gates (lint + format + typecheck + test)
 make test        # unit tests only
-make docker-up   # start Docker stack
-make help        # see all commands
+make lint        # ruff check
+make format      # ruff format
+make typecheck   # mypy
+make help        # all commands
 ```
-
-## Search Optimization
-
-| Optimization | Description | Impact |
-|---|---|---|
-| Parallel hybrid search | Image + caption vector queries run concurrently via `asyncio.gather()` | ~2x faster approach 2 |
-| Column projection | Search queries skip loading 1024-float embedding vectors | ~16x less memory/row |
-| HNSW `ef_search` tuning | `SET LOCAL hnsw.ef_search` applied per session (configurable recall vs speed) | Tunable accuracy |
-| `user_id` B-tree index | Index on `user_id` for efficient user-scoped searches | Faster filtered search |
-| Connection pool tuning | Configurable `db_pool_size`/`db_max_overflow`, `pool_pre_ping=True` | Stable under load |
-
-See `docs/specs/image-search/IS-015-search-optimization.md` for details.
 
 ## Architecture
 
@@ -180,8 +167,7 @@ sequenceDiagram
     API->>R: XADD image:uploaded {url}
     API-->>C: {image_id, status: "uploaded"}
     R->>W: Consume event
-    W->>M: Download image from URL
-    W->>J: embed_image()
+    W->>J: embed_image() via presigned URL
     J-->>W: 1024-dim vector
     W->>G: generate_caption()
     G-->>W: caption text
