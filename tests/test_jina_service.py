@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from image_search.infrastructure.ai.jina_service import JinaEmbeddingService
+from image_search.infrastructure.ai.jina_service import JinaEmbeddingService, _is_private_url
 
 
 def _fake_embedding(dim: int = 1024) -> list[float]:
@@ -173,3 +173,53 @@ class TestJinaConfig:
         assert settings.jina_model == "jina-embeddings-v4"
         assert settings.jina_dimensions == 1024
         assert settings.jina_api_url == "https://api.jina.ai/v1/embeddings"
+
+
+class TestIsPrivateUrl:
+    def test_localhost(self) -> None:
+        assert _is_private_url("http://localhost:9000/images/test.jpg") is True
+
+    def test_127_0_0_1(self) -> None:
+        assert _is_private_url("http://127.0.0.1:9000/images/test.jpg") is True
+
+    def test_192_168(self) -> None:
+        assert _is_private_url("http://192.168.1.100:9000/images/test.jpg") is True
+
+    def test_10_x(self) -> None:
+        assert _is_private_url("http://10.0.0.5:9000/images/test.jpg") is True
+
+    def test_172_private(self) -> None:
+        assert _is_private_url("http://172.16.0.5:9000/images/test.jpg") is True
+
+    def test_public_url(self) -> None:
+        assert _is_private_url("https://example.com/image.jpg") is False
+
+    def test_public_s3_url(self) -> None:
+        assert _is_private_url("https://s3.amazonaws.com/bucket/image.jpg") is False
+
+
+class TestLocalhostUrlDownload:
+    @pytest.mark.asyncio
+    async def test_embed_image_localhost_url_downloads_and_base64(self) -> None:
+        service = JinaEmbeddingService(api_key="test-key")
+
+        download_resp = MagicMock()
+        download_resp.content = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+        download_resp.raise_for_status = MagicMock()
+
+        api_resp = MagicMock()
+        api_resp.status_code = 200
+        api_resp.raise_for_status = MagicMock()
+        api_resp.json.return_value = {"data": [{"embedding": [0.1] * 1024}]}
+
+        with (
+            patch.object(service._client, "get", new_callable=AsyncMock, return_value=download_resp) as mock_get,
+            patch.object(service._client, "post", new_callable=AsyncMock, return_value=api_resp) as mock_post,
+        ):
+            result = await service.embed_image("http://localhost:9000/images/test.jpg")
+
+        assert len(result) == 1024
+        mock_get.assert_called_once()
+        call_args = mock_post.call_args
+        payload = call_args.kwargs.get("json") or call_args[1].get("json")
+        assert payload["input"][0]["image"].startswith("data:image/jpeg;base64,")
