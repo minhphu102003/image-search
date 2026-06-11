@@ -1,8 +1,9 @@
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from image_search.domain.entities import ImageEmbedding, ImageStatus
 from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
+from image_search.infrastructure.config import settings
 from image_search.infrastructure.database.models import ImageEmbeddingModel
 
 
@@ -12,6 +13,24 @@ def _to_entity(model: ImageEmbeddingModel) -> ImageEmbedding:
         image_id=model.image_id,
         embedding=list(model.embedding),
         caption_embedding=list(model.caption_embedding) if model.caption_embedding is not None else None,
+        model_name=model.model_name,
+        caption=model.caption,
+        file_path=model.file_path,
+        user_id=model.user_id,
+        status=ImageStatus(model.status),
+        error_message=model.error_message,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def _to_entity_light(model: ImageEmbeddingModel) -> ImageEmbedding:
+    """Map model to entity without loading embedding vectors (cheaper for search results)."""
+    return ImageEmbedding(
+        id=model.id,
+        image_id=model.image_id,
+        embedding=None,
+        caption_embedding=None,
         model_name=model.model_name,
         caption=model.caption,
         file_path=model.file_path,
@@ -74,9 +93,13 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
         model = result.scalar_one_or_none()
         return _to_entity(model) if model is not None else None
 
+    async def _set_ef_search(self) -> None:
+        await self.session.execute(text(f"SET LOCAL hnsw.ef_search = {settings.hnsw_ef_search}"))
+
     async def search_by_embedding(
         self, query_embedding: list[float], limit: int = 10, user_id: str | None = None
     ) -> list[ImageEmbedding]:
+        await self._set_ef_search()
         distance = ImageEmbeddingModel.embedding.cosine_distance(query_embedding)
         stmt = (
             select(ImageEmbeddingModel).where(ImageEmbeddingModel.status == "INDEXED").order_by(distance).limit(limit)
@@ -85,7 +108,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
             stmt = stmt.where(ImageEmbeddingModel.user_id == user_id)
 
         result = await self.session.execute(stmt)
-        return [_to_entity(m) for m in result.scalars().all()]
+        return [_to_entity_light(m) for m in result.scalars().all()]
 
     async def delete_by_image_id(self, image_id: str) -> bool:
         result = await self.session.execute(select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == image_id))
@@ -108,6 +131,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
     async def search_by_embedding_with_scores(
         self, query_embedding: list[float], limit: int = 10, user_id: str | None = None
     ) -> list[tuple[ImageEmbedding, float]]:
+        await self._set_ef_search()
         distance = ImageEmbeddingModel.embedding.cosine_distance(query_embedding)
         score = (1 - distance).label("score")
         stmt = (
@@ -120,11 +144,12 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
             stmt = stmt.where(ImageEmbeddingModel.user_id == user_id)
 
         result = await self.session.execute(stmt)
-        return [(_to_entity(row[0]), float(row[1])) for row in result.all()]
+        return [(_to_entity_light(row[0]), float(row[1])) for row in result.all()]
 
     async def search_caption_embedding_with_scores(
         self, query_embedding: list[float], limit: int = 10
     ) -> list[tuple[ImageEmbedding, float]]:
+        await self._set_ef_search()
         distance = ImageEmbeddingModel.caption_embedding.cosine_distance(query_embedding)
         score = (1 - distance).label("score")
         stmt = (
@@ -136,7 +161,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
         )
 
         result = await self.session.execute(stmt)
-        return [(_to_entity(row[0]), float(row[1])) for row in result.all()]
+        return [(_to_entity_light(row[0]), float(row[1])) for row in result.all()]
 
     async def update_caption(self, image_id: str, caption: str, caption_embedding: list[float]) -> None:
         stmt = (

@@ -14,7 +14,7 @@ class ImageStatus(str, Enum):
 class ImageEmbedding:
     id: str
     image_id: str
-    embedding: list[float]
+    embedding: list[float] | None
     caption_embedding: list[float] | None
     model_name: str
     caption: str | None
