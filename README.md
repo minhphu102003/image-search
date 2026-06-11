@@ -40,8 +40,10 @@ The image is stored in MinIO and an event is published to Redis. The ingest work
 ```bash
 curl -X POST http://localhost:8000/api/v1/image-search \
   -H "Content-Type: application/json" \
-  -d '{"query": "a red car", "top_k": 10, "approach": 1}'
+  -d '{"query": "a red car", "top_k": 10, "approach": 2}'
 ```
+
+Results below `min_score_threshold` (default 0.5) are filtered out.
 
 | Approach | Name | Speed | Cost |
 |----------|------|-------|------|
@@ -178,16 +180,20 @@ sequenceDiagram
     end
 
     rect rgb(220, 255, 220)
-    Note over C,PG: Search Flow
+    Note over C,PG: Search Flow (Hybrid — default approach 2)
     C->>API: POST /api/v1/image-search {query}
     API->>J: embed_text(query)
-    J-->>API: 1024-dim vector
-    API->>PG: cosine similarity search
-    PG-->>API: top-k results
-    API-->>C: [{image_id, file_path, score}]
+    J-->>API: 1024-dim query vector
+    API->>PG: cosine search on image embedding
+    PG-->>API: top-k by image similarity
+    API->>PG: cosine search on caption embedding
+    PG-->>API: top-k by caption similarity
+    API->>API: RRF fusion (merge + rerank)
+    API->>API: filter by min_score_threshold (0.5)
+    API-->>C: [{image_id, file_path, score, caption}]
     end
 ```
 
 ## Specs
 
-Implementation specs: `docs/specs/image-search/IS-001..IS-012`
+Implementation specs: `docs/specs/image-search/IS-001..IS-014`
