@@ -24,6 +24,9 @@ def _is_private_url(url: str) -> bool:
         return False
     if host in _PRIVATE_HOSTS:
         return True
+    # Docker service names (e.g. "minio") have no dots — not publicly resolvable
+    if "." not in host:
+        return True
     if host.startswith("10.") or host.startswith("192.168."):
         return True
     if host.startswith("172."):
