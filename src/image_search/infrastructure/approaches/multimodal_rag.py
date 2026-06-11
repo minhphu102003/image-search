@@ -3,6 +3,7 @@ import structlog
 from image_search.domain.prompts import RAG_SYSTEM_PROMPT
 from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
 from image_search.domain.search_approach import SearchApproach, SearchResponse, SearchResult
+from image_search.infrastructure.config import settings
 
 logger = structlog.get_logger()
 
@@ -13,14 +14,16 @@ class MultimodalRAGApproach(SearchApproach):
         repository: ImageEmbeddingRepositoryPort,
         gemini_api_key: str,
         top_k_retrieve: int = 5,
-        gemini_model: str = "gemini-2.0-flash",
+        gemini_model: str = "gemini-2.5-flash",
     ) -> None:
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
         self.repository = repository
         self.top_k_retrieve = top_k_retrieve
-        genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel(gemini_model, system_instruction=RAG_SYSTEM_PROMPT)
+        self.client = genai.Client(api_key=gemini_api_key)
+        self.model_name = gemini_model
+        self.gen_config = types.GenerateContentConfig(system_instruction=RAG_SYSTEM_PROMPT)
 
     async def search(self, query_vector: list[float], top_k: int, query_text: str) -> SearchResponse:
         rows = await self.repository.search_by_embedding_with_scores(
@@ -39,6 +42,7 @@ class MultimodalRAGApproach(SearchApproach):
                 caption=entity.caption,
             )
             for entity, score in rows
+            if score >= settings.min_score_threshold
         ]
 
         image_parts = self._load_images(images)
@@ -67,7 +71,11 @@ class MultimodalRAGApproach(SearchApproach):
                 f"Analyze the following {len(image_parts)} images and answer the question."
             )
             prompt_parts = [user_message] + image_parts
-            response = await self.model.generate_content_async(prompt_parts)
+            response = await self.client.aio.models.generate_content(
+                model=self.model_name,
+                contents=prompt_parts,
+                config=self.gen_config,
+            )
             return str(response.text.strip())
         except Exception as e:
             logger.error("gemini_failed", error=str(e))

@@ -12,7 +12,8 @@ _NOW = datetime.now(timezone.utc)
 
 _MOCK_MODULES = {
     "google": MagicMock(),
-    "google.generativeai": MagicMock(),
+    "google.genai": MagicMock(),
+    "google.genai.types": MagicMock(),
     "PIL": MagicMock(),
     "PIL.Image": MagicMock(),
 }
@@ -41,15 +42,15 @@ def _make_approach(repo: AsyncMock) -> MultimodalRAGApproach:
 
 
 def _set_gemini_response(approach: MultimodalRAGApproach, text: str) -> None:
-    mock_model = MagicMock()
-    mock_model.generate_content_async = AsyncMock(return_value=SimpleNamespace(text=text))
-    approach.model = mock_model
+    mock_aio = MagicMock()
+    mock_aio.models.generate_content = AsyncMock(return_value=SimpleNamespace(text=text))
+    approach.client.aio = mock_aio
 
 
 def _set_gemini_failure(approach: MultimodalRAGApproach, error: str = "API error") -> None:
-    mock_model = MagicMock()
-    mock_model.generate_content_async = AsyncMock(side_effect=Exception(error))
-    approach.model = mock_model
+    mock_aio = MagicMock()
+    mock_aio.models.generate_content = AsyncMock(side_effect=Exception(error))
+    approach.client.aio = mock_aio
 
 
 class TestMultimodalRAGApproach:
@@ -141,7 +142,8 @@ class TestMultimodalRAGApproach:
         with patch.object(approach, "_load_images", return_value=mock_images):
             await approach.search([0.1] * 1024, top_k=10, query_text="What is this?")
 
-        approach.model.generate_content_async.assert_awaited_once()
-        call_args = approach.model.generate_content_async.call_args[0][0]
-        assert "What is this?" in call_args[0]
-        assert len(call_args) == 3  # prompt + 2 images
+        approach.client.aio.models.generate_content.assert_awaited_once()
+        call_kwargs = approach.client.aio.models.generate_content.call_args.kwargs
+        contents = call_kwargs["contents"]
+        assert "What is this?" in contents[0]
+        assert len(contents) == 3  # prompt + 2 images

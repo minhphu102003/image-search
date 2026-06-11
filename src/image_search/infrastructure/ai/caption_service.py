@@ -12,21 +12,21 @@ logger = structlog.get_logger()
 
 
 class GeminiCaptionService(CaptionService):
-    """Caption service using Google Gemini API. Requires google-generativeai package."""
+    """Caption service using Google Gemini API. Requires google-genai package."""
 
     def __init__(
         self,
         api_key: str,
-        model: str = "gemini-2.0-flash",
+        model: str = "gemini-2.5-flash",
         prompt: str = CAPTION_PROMPT,
     ) -> None:
         try:
-            import google.generativeai as genai
+            from google import genai
 
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(model)
+            self.client = genai.Client(api_key=api_key)
+            self.model_name = model
         except ImportError:
-            raise ImportError("google-generativeai is required. Install with: uv sync --extra ai")
+            raise ImportError("google-genai is required. Install with: uv sync")
         self.prompt = prompt
 
     @staticmethod
@@ -66,7 +66,13 @@ class GeminiCaptionService(CaptionService):
 
         start = time.time()
         loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(None, lambda: self.model.generate_content([self.prompt, image]))
+        response = await loop.run_in_executor(
+            None,
+            lambda: self.client.models.generate_content(
+                model=self.model_name,
+                contents=[self.prompt, image],
+            ),
+        )
         elapsed = time.time() - start
         caption: str = response.text.strip()
 
@@ -76,6 +82,6 @@ class GeminiCaptionService(CaptionService):
             caption=caption,
             caption_length=len(caption),
             elapsed_s=round(elapsed, 2),
-            model=self.model._model_name if hasattr(self.model, "_model_name") else "unknown",
+            model=self.model_name,
         )
         return caption
