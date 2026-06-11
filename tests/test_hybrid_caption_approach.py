@@ -1,5 +1,6 @@
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -73,68 +74,88 @@ class TestReciprocalRankFusion:
 # --- HybridCaptionApproach tests ---
 
 
+def _make_session_factory(clip_return, caption_return):
+    """Create a mock session factory that returns repos with configured search results."""
+    mock_repo = AsyncMock()
+    mock_repo.search_by_embedding_with_scores = AsyncMock(return_value=clip_return)
+    mock_repo.search_caption_embedding_with_scores = AsyncMock(return_value=caption_return)
+
+    @asynccontextmanager
+    async def _session_ctx():
+        yield AsyncMock()
+
+    # MagicMock because async_sessionmaker.__call__ is sync (returns async ctx mgr)
+    factory = MagicMock(side_effect=_session_ctx)
+
+    patcher = patch(
+        "image_search.infrastructure.approaches.hybrid_caption.SqlAlchemyImageEmbeddingRepository",
+        return_value=mock_repo,
+    )
+    patcher.start()
+    return factory, patcher
+
+
 class TestHybridCaptionApproach:
     @pytest.mark.asyncio
     async def test_fuses_clip_and_caption_results(self) -> None:
-        repo = AsyncMock()
-        repo.search_by_embedding_with_scores = AsyncMock(
-            return_value=[(_emb("a", "/a.jpg", "car"), 0.9), (_emb("b", "/b.jpg"), 0.7)]
-        )
-        repo.search_caption_embedding_with_scores = AsyncMock(
-            return_value=[(_emb("b", "/b.jpg"), 0.95), (_emb("c", "/c.jpg", "vehicle"), 0.6)]
-        )
-        approach = HybridCaptionApproach(repo, rrf_k=60)
+        clip = [(_emb("a", "/a.jpg", "car"), 0.9), (_emb("b", "/b.jpg"), 0.7)]
+        caption = [(_emb("b", "/b.jpg"), 0.95), (_emb("c", "/c.jpg", "vehicle"), 0.6)]
+        factory, patcher = _make_session_factory(clip, caption)
+        try:
+            approach = HybridCaptionApproach(factory, rrf_k=60)
+            result = await approach.search([0.1] * 1024, top_k=10, query_text="a red car")
 
-        result = await approach.search([0.1] * 1024, top_k=10, query_text="a red car")
-
-        assert isinstance(result, SearchResponse)
-        ids = [img.image_id for img in result.images]
-        # b appears in both -> should be first
-        assert ids[0] == "b"
-        assert len(result.images) == 3
-        assert result.answer is None
+            assert isinstance(result, SearchResponse)
+            ids = [img.image_id for img in result.images]
+            assert ids[0] == "b"
+            assert len(result.images) == 3
+            assert result.answer is None
+        finally:
+            patcher.stop()
 
     @pytest.mark.asyncio
     async def test_fallback_to_clip_when_no_captions(self) -> None:
-        repo = AsyncMock()
-        repo.search_by_embedding_with_scores = AsyncMock(
-            return_value=[(_emb("a", "/a.jpg"), 0.9), (_emb("b", "/b.jpg"), 0.7)]
-        )
-        repo.search_caption_embedding_with_scores = AsyncMock(return_value=[])
-        approach = HybridCaptionApproach(repo, rrf_k=60)
+        clip = [(_emb("a", "/a.jpg"), 0.9), (_emb("b", "/b.jpg"), 0.7)]
+        factory, patcher = _make_session_factory(clip, [])
+        try:
+            approach = HybridCaptionApproach(factory, rrf_k=60)
+            result = await approach.search([0.1] * 1024, top_k=10, query_text="test")
 
-        result = await approach.search([0.1] * 1024, top_k=10, query_text="test")
-
-        assert len(result.images) == 2
-        assert result.images[0].image_id == "a"
-        assert result.images[0].score == 0.9
+            assert len(result.images) == 2
+            assert result.images[0].image_id == "a"
+            assert result.images[0].score == 0.9
+        finally:
+            patcher.stop()
 
     @pytest.mark.asyncio
     async def test_respects_top_k_limit(self) -> None:
-        repo = AsyncMock()
         clip = [(_emb(f"clip-{i}"), 0.9 - i * 0.01) for i in range(20)]
         caption = [(_emb(f"cap-{i}"), 0.8 - i * 0.01) for i in range(20)]
-        repo.search_by_embedding_with_scores = AsyncMock(return_value=clip)
-        repo.search_caption_embedding_with_scores = AsyncMock(return_value=caption)
-        approach = HybridCaptionApproach(repo, rrf_k=60)
+        factory, patcher = _make_session_factory(clip, caption)
+        try:
+            approach = HybridCaptionApproach(factory, rrf_k=60)
+            result = await approach.search([0.1] * 1024, top_k=5, query_text="test")
 
-        result = await approach.search([0.1] * 1024, top_k=5, query_text="test")
-
-        assert len(result.images) == 5
+            assert len(result.images) == 5
+        finally:
+            patcher.stop()
 
     @pytest.mark.asyncio
     async def test_implements_search_approach_interface(self) -> None:
-        repo = AsyncMock()
-        approach = HybridCaptionApproach(repo)
-        assert isinstance(approach, SearchApproach)
+        factory, patcher = _make_session_factory([], [])
+        try:
+            approach = HybridCaptionApproach(factory)
+            assert isinstance(approach, SearchApproach)
+        finally:
+            patcher.stop()
 
     @pytest.mark.asyncio
     async def test_empty_database_returns_empty(self) -> None:
-        repo = AsyncMock()
-        repo.search_by_embedding_with_scores = AsyncMock(return_value=[])
-        repo.search_caption_embedding_with_scores = AsyncMock(return_value=[])
-        approach = HybridCaptionApproach(repo)
+        factory, patcher = _make_session_factory([], [])
+        try:
+            approach = HybridCaptionApproach(factory)
+            result = await approach.search([0.1] * 1024, top_k=10, query_text="test")
 
-        result = await approach.search([0.1] * 1024, top_k=10, query_text="test")
-
-        assert result.images == []
+            assert result.images == []
+        finally:
+            patcher.stop()

@@ -1,7 +1,10 @@
-import structlog
+import asyncio
 
+import structlog
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+from image_search.adapters.output.sqlalchemy_repo import SqlAlchemyImageEmbeddingRepository
 from image_search.domain.entities import ImageEmbedding
-from image_search.domain.ports.repositories import ImageEmbeddingRepositoryPort
 from image_search.domain.search_approach import SearchApproach, SearchResponse, SearchResult
 from image_search.infrastructure.config import settings
 
@@ -28,30 +31,29 @@ def reciprocal_rank_fusion(
 
 
 class HybridCaptionApproach(SearchApproach):
-    def __init__(self, repository: ImageEmbeddingRepositoryPort, rrf_k: int = 60) -> None:
-        self.repository = repository
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession], rrf_k: int = 60) -> None:
+        self.session_factory = session_factory
         self.rrf_k = rrf_k
 
     async def search(self, query_vector: list[float], top_k: int, query_text: str) -> SearchResponse:
-        min_score = settings.min_score_threshold
+        min_cosine = settings.min_score_threshold
+        # RRF scores are much smaller than cosine (max ~0.032 for k=60), use a separate threshold
+        min_rrf = min_cosine * 0.03  # ~0.015 for default threshold=0.5
 
-        clip_results = [
-            (e, s)
-            for e, s in await self.repository.search_by_embedding_with_scores(
-                query_embedding=query_vector,
-                limit=top_k,
-            )
-            if s >= min_score
-        ]
+        async def _search_clip() -> list[tuple[ImageEmbedding, float]]:
+            async with self.session_factory() as session:
+                repo = SqlAlchemyImageEmbeddingRepository(session)
+                return await repo.search_by_embedding_with_scores(query_embedding=query_vector, limit=top_k)
 
-        caption_results = [
-            (e, s)
-            for e, s in await self.repository.search_caption_embedding_with_scores(
-                query_embedding=query_vector,
-                limit=top_k,
-            )
-            if s >= min_score
-        ]
+        async def _search_caption() -> list[tuple[ImageEmbedding, float]]:
+            async with self.session_factory() as session:
+                repo = SqlAlchemyImageEmbeddingRepository(session)
+                return await repo.search_caption_embedding_with_scores(query_embedding=query_vector, limit=top_k)
+
+        clip_raw, caption_raw = await asyncio.gather(_search_clip(), _search_caption())
+
+        clip_results = [(e, s) for e, s in clip_raw if s >= min_cosine]
+        caption_results = [(e, s) for e, s in caption_raw if s >= min_cosine]
 
         if not caption_results:
             merged = clip_results
@@ -70,6 +72,7 @@ class HybridCaptionApproach(SearchApproach):
                 caption=entity.caption,
             )
             for entity, score in merged[:top_k]
+            if score >= min_rrf
         ]
 
         return SearchResponse(images=images)

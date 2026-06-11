@@ -71,7 +71,7 @@ def get_approaches(
     try:
         from image_search.infrastructure.approaches.hybrid_caption import HybridCaptionApproach
 
-        approaches[2] = HybridCaptionApproach(repo)
+        approaches[2] = HybridCaptionApproach(async_session)
     except ImportError:
         pass
 
