@@ -99,6 +99,18 @@ make docker-up   # start Docker stack
 make help        # see all commands
 ```
 
+## Search Optimization
+
+| Optimization | Description | Impact |
+|---|---|---|
+| Parallel hybrid search | Image + caption vector queries run concurrently via `asyncio.gather()` | ~2x faster approach 2 |
+| Column projection | Search queries skip loading 1024-float embedding vectors | ~16x less memory/row |
+| HNSW `ef_search` tuning | `SET LOCAL hnsw.ef_search` applied per session (configurable recall vs speed) | Tunable accuracy |
+| `user_id` B-tree index | Index on `user_id` for efficient user-scoped searches | Faster filtered search |
+| Connection pool tuning | Configurable `db_pool_size`/`db_max_overflow`, `pool_pre_ping=True` | Stable under load |
+
+See `docs/specs/image-search/IS-015-search-optimization.md` for details.
+
 ## Architecture
 
 **Clean Architecture dependency flow:**
@@ -196,4 +208,4 @@ sequenceDiagram
 
 ## Specs
 
-Implementation specs: `docs/specs/image-search/IS-001..IS-014`
+Implementation specs: `docs/specs/image-search/IS-001..IS-015`
