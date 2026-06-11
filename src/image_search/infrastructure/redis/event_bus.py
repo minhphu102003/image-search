@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any, Awaitable, Callable
 
@@ -34,7 +35,13 @@ class RedisEventBus(EventBus):
                 raise
 
         while True:
-            results = await self.redis.xreadgroup(group, consumer, {stream: ">"}, count=1, block=5000)
+            try:
+                results = await self.redis.xreadgroup(group, consumer, {stream: ">"}, count=1, block=5000)
+            except Exception as e:
+                logger.warning("redis_xreadgroup_error", error=str(e))
+                await asyncio.sleep(2)
+                continue
+
             if not results:
                 continue
 
