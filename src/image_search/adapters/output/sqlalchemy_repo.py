@@ -42,6 +42,10 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def _commit(self) -> None:
+        await self.session.flush()
+        await self.session.commit()
+
     async def save(self, entity: ImageEmbedding) -> ImageEmbedding:
         existing = await self.session.execute(
             select(ImageEmbeddingModel).where(ImageEmbeddingModel.image_id == entity.image_id)
@@ -57,12 +61,12 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
             found.user_id = entity.user_id
             found.status = entity.status.value
             found.error_message = entity.error_message
-            await self.session.flush()
+            await self._commit()
             return _to_entity(found)
 
         model = _to_model(entity)
         self.session.add(model)
-        await self.session.flush()
+        await self._commit()
         return _to_entity(model)
 
     async def get_by_image_id(self, image_id: str) -> ImageEmbedding | None:
@@ -89,6 +93,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
         if model is None:
             return False
         await self.session.delete(model)
+        await self._commit()
         return True
 
     async def update_status(self, image_id: str, status: str, error: str | None = None) -> None:
@@ -98,7 +103,7 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
             .values(status=status, error_message=error)
         )
         await self.session.execute(stmt)
-        await self.session.flush()
+        await self._commit()
 
     async def search_by_embedding_with_scores(
         self, query_embedding: list[float], limit: int = 10, user_id: str | None = None
@@ -140,4 +145,4 @@ class SqlAlchemyImageEmbeddingRepository(ImageEmbeddingRepositoryPort):
             .values(caption=caption, caption_embedding=caption_embedding)
         )
         await self.session.execute(stmt)
-        await self.session.flush()
+        await self._commit()
